@@ -1,4 +1,4 @@
-var app = WinJS.Application;
+cordova.define("cordova-plugin-bluetooth-serial.BluetoothSerial", function(require, exports, module) { var app = WinJS.Application;
 var bluetooth = Windows.Devices.Bluetooth;
 var deviceInfo = Windows.Devices.Enumeration.DeviceInformation;
 var rfcomm = Windows.Devices.Bluetooth.Rfcomm;
@@ -50,57 +50,64 @@ module.exports = {
 
     receiveStringLoop: function (reader) {
         // Read first byte (length of the subsequent message, 255 or less). 
-        reader.loadAsync(1).done(function (size) {
-            if (size != 1) {
+        try
+        {
+            reader.loadAsync(1).done(function (size) {
+                if (size != 1) {
                 
-                console.log("The underlying socket was closed before we were able to read the whole data. Client disconnected.", "sample", "status");
-                return;
-            }
-
-            // Read the message. 
-            var messageLength = reader.readByte();
-            reader.loadAsync(messageLength).done(function (actualMessageLength) {
-                if (messageLength != actualMessageLength) {
-                    console.log("The underlying socket was closed before we were able to read the whole data.", "sample", "status");
+                    console.log("The underlying socket was closed before we were able to read the whole data. Client disconnected.", "sample", "status");
                     return;
                 }
 
-                //var message = reader.readString(actualMessageLength);
-                bufferBytes = new Uint8Array(actualMessageLength);
-                reader.readBytes(bufferBytes);
-
-                // unfortunately IE doesn't support TextDecoder, so we need another solution...
-                buffer = uintToString(bufferBytes);
-
-                if (subscribeRawCallback && typeof (subscribeRawCallback) !== "undefined") {
-                    subscribeRawCallback(bufferBytes);
-                }
-
-                if (subscribeCallback && typeof (subscribeCallback) !== "undefined") {
-                    module.exports.sendDataToSubscriber();
-                }
-                if (isDisconnect) {
-
-                    if (writer) {
-                        writer.detachStream();
-                        writer = null;
+                // Read the message. 
+                var messageLength = reader.readByte();
+                reader.loadAsync(messageLength).done(function (actualMessageLength) {
+                    if (messageLength != actualMessageLength) {
+                        console.log("The underlying socket was closed before we were able to read the whole data.", "sample", "status");
+                        return;
                     }
 
-                    if (socket) {
-                        socket.close();
-                        socket = null;
+                    //var message = reader.readString(actualMessageLength);
+                    bufferBytes = new Uint8Array(actualMessageLength);
+                    reader.readBytes(bufferBytes);
 
+                    // unfortunately IE doesn't support TextDecoder, so we need another solution...
+                    buffer = uintToString(bufferBytes);
+
+                    if (subscribeRawCallback && typeof (subscribeRawCallback) !== "undefined") {
+                        subscribeRawCallback(bufferBytes);
                     }
-                }
-                else {
-                    WinJS.Promise.timeout().done(function () { return module.exports.receiveStringLoop(reader); });
-                }
+
+                    if (subscribeCallback && typeof (subscribeCallback) !== "undefined") {
+                        module.exports.sendDataToSubscriber();
+                    }
+                    if (isDisconnect) {
+
+                        if (writer) {
+                            writer.detachStream();
+                            writer = null;
+                        }
+
+                        if (socket) {
+                            socket.close();
+                            socket = null;
+
+                        }
+                    }
+                    else {
+                        WinJS.Promise.timeout().done(function () { return module.exports.receiveStringLoop(reader); });
+                    }
+                }, function (error) {
+                    console.log("loadAsync -> Failed to read the message, with error: " + error, "sample", "error");
+                });
             }, function (error) {
-                console.log("loadAsync -> Failed to read the message, with error: " + error, "sample", "error");
+                console.log("Failed to read the message size, with error: " + error, "sample", "error");
             });
-        }, function (error) {
-            console.log("Failed to read the message size, with error: " + error, "sample", "error");
-        });
+        }
+        catch(error)
+        {
+            console.log("Socket closed: " + error);
+        }
     },
 
     list: function (success, failure, args) {
@@ -278,3 +285,5 @@ module.exports = {
 }
 
 require("cordova/exec/proxy").add("BluetoothSerial", module.exports);
+
+});
